@@ -3,6 +3,9 @@ import mido
 import numpy as np
 import time
 import threading
+import multiprocessing
+from collections import defaultdict
+import partitura as pt
 
 
 class MidiInputThread(threading.Thread):
@@ -11,7 +14,7 @@ class MidiInputThread(threading.Thread):
         port,
         queue,
         init_time=None,
-        pipeline=midi_msg_to_pt_note,
+        pipeline=None,
         return_midi_messages=False,
     ):
         threading.Thread.__init__(self)
@@ -281,36 +284,134 @@ def play_midi_from_score(score=None,
         if print_messages:
             print(m)
 
-class MidiOutputThread(threading.Thread):
+class Sequencer(multiprocessing.Process):
     def __init__(
         self,
-        router
-    ):
-        threading.Thread.__init__(self)
+        outport_name="seq",
+        queue=None,
+        *args, 
+        **kwargs):
+        super(Sequencer, self).__init__(*args, **kwargs)
+        self.queue = queue
+        self.outport_name = outport_name
+        self.router = None
 
-        self.router = router
+        # sequencer variables
+        self.playhead = 0
+        self.playing = False
+        self.start_time = 0
+        self.tempo = 120
+        self.quarter_per_ns = self.tempo / ( 60 * 1e9)
+        self.next_time = 0
 
-    def run(self,quarter_duration=1, 
-                default_velocity=60,
-                print_messages=False):
-    
-        global score
-        note_array = score.note_array()
-        onset_sec = note_array["onset_quarter"] * quarter_duration
-        offset_sec = note_array["duration_quarter"] * quarter_duration + onset_sec
-        noteon_messages = np.array([("note_on", p, onset_sec[i]) for i, p in enumerate(note_array["pitch"])], dtype=[("msg", "<U10"), ("pitch", int), ("time", float)])
-        noteoff_messages = np.array([("note_off", p, offset_sec[i]) for i, p in enumerate(note_array["pitch"])], dtype=[("msg", "<U10"), ("pitch", int), ("time", float)])
-        messages = np.concatenate([noteon_messages, noteoff_messages])
-        messages = np.sort(messages, order="time")
-        timediff = np.diff(messages["time"])
-        output_port = self.router.output_port
+        # music variables
+        self.default_velocity = 60
+        self.loop_start_quarter = 0
+        self.loop_end_quarter = 4
+        self.looped_notes = None
+        self.onset_quarter = None
+        self.offset_quarter = None
+        self.messages = None
+        self.message_times = None
 
-        for i, msg in enumerate(messages):
-            if i == 0:
+    def up(self, args):
+        self.queue.put(args)
+
+    def update_part(self, part):
+        pass
+        note_array = part.note_array()
+        mask_lower = note_array["onset_quarter"] >= self.loop_start_quarter           
+        mask_upper = note_array["onset_quarter"] < self.loop_end_quarter
+        mask = np.all((mask_lower, mask_upper), axis=0)
+        self.looped_notes = note_array[mask]
+        self.onset_quarter = note_array[mask]["onset_quarter"]
+        self.offset_quarter = np.clip(note_array[mask]["duration_quarter"] + self.onset_quarter, 
+                                      self.loop_start_quarter, 
+                                      self.loop_end_quarter-0.1)
+        
+        self.messages = defaultdict(list)
+        self.message_times = np.array([])
+
+        for i, note in enumerate(self.looped_notes):
+            on = mido.Message('note_on', 
+                         note=note["pitch"], 
+                         velocity=self.default_velocity, 
+                         time=0)
+            off = mido.Message('note_off',
+                            note=note["pitch"],
+                            velocity=0,
+                            time=0)
+            self.messages[self.onset_quarter[i]].append(on)
+            self.messages[self.offset_quarter[i]].append(off)
+
+        self.message_times = np.sort(np.array(list(self.messages.keys())))
+        self.next_time = self.message_times[0]
+        
+    def run(self):
+        self.start_time = time.perf_counter_ns()
+        self.router = MidiRouter(outport_name = self.outport_name)
+        self.playing = True
+        print("Sequencer started")        
+        while self.playing:
+            try: 
+                args = self.queue.get_nowait()
+                # print(args.note_array())
+                self.update_part(args)
+            except:
                 pass
+
+            current_time = time.perf_counter_ns()
+            elapsed_time = current_time - self.start_time
+            elapsed_quarter = elapsed_time * self.quarter_per_ns
+            self.playhead = elapsed_quarter % (self.loop_end_quarter - self.loop_start_quarter)
+            if self.playhead >= self.next_time - 0.02 and \
+                self.playhead < self.next_time + 0.1 and \
+                self.messages is not None:
+
+                for msg in self.messages[self.next_time]:
+                    self.router.output_port.send(msg)
+                    
+
+                # this_time = self.next_time
+                idx, = np.where(self.message_times == self.next_time)
+                i = idx[0]
+                self.next_time = self.message_times[(i+1)%len(self.message_times)]
+                # print("sent", msg, i, self.next_time, self.playhead, self.message_times)
+                # time.sleep((self.next_time - this_time) / 2* self.quarter_per_ns * 1e9)
+
             else:
-                time.sleep(timediff[i-1])
-            m = mido.Message(msg["msg"], note=msg["pitch"], velocity=default_velocity)
-            output_port.send(m)
-            if print_messages:
-                print(m)
+                time.sleep(0.02)
+
+    # def stop(self):
+    #     self.playing = False
+    #     self.join()
+
+def addnote(midipitch, part, 
+            voice = 1, 
+            start = 0, 
+            end = 1, 
+            idx = 0):
+    """
+    adds a single note by midipitch to a part
+    """
+    step, alter, octave = pt.utils.music.midi_pitch_to_pitch_spelling(midipitch)
+
+    part.add(pt.score.Note(id='n{}'.format(idx), step=step, 
+                        octave=int(octave), alter=alter, voice=voice, staff=int(voice)),
+                        start=start, end=end)
+
+if __name__ == "__main__":
+    part = pt.load_musicxml(pt.EXAMPLE_MUSICXML)[0]
+    queue =multiprocessing.Queue()
+    s = Sequencer(queue=queue,
+                  outport_name="iM/ONE")
+    s.start()
+    time.sleep(2)
+    s.up(part)
+
+    # addnote(97, part, start=3, end=4, idx=100)
+    # s.up(part)
+
+    # time.sleep(4)
+    # s.terminate()
+    # s.join()
