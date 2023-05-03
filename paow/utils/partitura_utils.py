@@ -26,11 +26,15 @@ def addnote(midipitch, part, voice, start, end, idx):
                         start=start, end=end)
 
 
-def partFromProgression(prog, quarter_duration = 4 ):
+def partFromProgression(prog, 
+                        quarter_duration = 4,
+                        rhythm = None):
     part = pt.score.Part('P0', 'part from progression', quarter_duration=quarter_duration)
+    if rhythm is None:
+        rhythm = [(i, i+1) for i in range(len(prog.chords))]
     for i, c in enumerate(prog.chords):
         for j, pitch in enumerate(c.pitches):
-            addnote(pitch, part, j, i*quarter_duration, (i+1)*quarter_duration, str(j)+str(i))
+            addnote(pitch, part, j, rhythm[i][0]*quarter_duration, rhythm[i][1]*quarter_duration, str(j)+str(i))
     
     return part
 
@@ -53,3 +57,22 @@ def addmelody2part(part, na, quarter_duration = 4):
                     note["onset_sec"], 
                     note["duration_sec"]+note["onset_sec"], 
                     str(j)+"_melody")
+            
+
+def progression_and_melody_to_part(progression, 
+                                   melody,
+                                   quarter_duration = 4,
+                                   rhythm = None):
+    """
+    converts a progression and a melody to a partitura part
+    """
+    part = partFromProgression(progression,
+                               quarter_duration = quarter_duration,
+                               rhythm = rhythm
+                               )
+    na, _ = parttimefromrekorder(melody,
+                                 quarter_duration = quarter_duration,
+                                 num_frames = len(progression.chords)
+                                )
+    addmelody2part(part, na)
+    return part

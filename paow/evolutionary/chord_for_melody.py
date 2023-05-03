@@ -1,13 +1,11 @@
 
 import numpy as np
 
-
+from paow.utils import Chord, Progression
 
 class Optimizer:
     def __init__(self) -> None:
         pass    
-
-
     def modify(self, population):
         # add an accidental
         subpop3 = np.random.choice(population, 30)
