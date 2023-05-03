@@ -31,23 +31,33 @@ def partFromProgression(prog,
                         rhythm = None):
     part = pt.score.Part('P0', 'part from progression', quarter_duration=quarter_duration)
     if rhythm is None:
-        rhythm = [(i, i+1) for i in range(len(prog.chords))]
+        rhythm = [(i*quarter_duration, (i+1)*quarter_duration) for i in range(len(prog.chords))]
     for i, c in enumerate(prog.chords):
         for j, pitch in enumerate(c.pitches):
-            addnote(pitch, part, j, rhythm[i][0]*quarter_duration, rhythm[i][1]*quarter_duration, str(j)+str(i))
+            addnote(pitch, part, j, rhythm[i][0], rhythm[i][1], str(j)+str(i))
     
     return part
 
 
 def parttimefromrekorder(na, 
                          quarter_duration = 4,
-                         num_frames = 8):
+                         quarters = 8,
+                         num_frames = 8,
+                         rhythm = None):
+    positions = quarter_duration * quarters
+    sec_per_div = 10/quarters/quarter_duration
+    if rhythm is None:
+        interval = positions//num_frames
+        rhythm = [(i*interval, (i+1)*interval) for i in range(num_frames)]
+
     frames = list()
     for k in range(num_frames):
-        frames.append(na["pitch"][np.logical_and(na["onset_sec"] < (k+1)*1.25, na["onset_sec"] >= k*1.25)])
-    time_per_div = (num_frames/10) / quarter_duration
-    na["onset_sec"] = np.round(na["onset_sec"]/time_per_div)
-    na["duration_sec"] = np.round(na["duration_sec"]/time_per_div)
+        frames.append(na["pitch"][np.logical_and(
+            na["onset_sec"] < rhythm[k][1]*sec_per_div, 
+            na["onset_sec"] >= rhythm[k][0]*sec_per_div)])
+    # time_per_div = (num_frames/10) / quarter_duration
+    na["onset_sec"] = np.round(na["onset_sec"]/sec_per_div)
+    na["duration_sec"] = np.round(na["duration_sec"]/sec_per_div)
     na["duration_sec"][na["duration_sec"] < 1] = 1   
     return na, frames
 

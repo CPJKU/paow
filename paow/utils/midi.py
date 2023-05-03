@@ -12,53 +12,58 @@ class MidiInputThread(threading.Thread):
     def __init__(
         self,
         port,
-        queue,
+        queue = list(),
         init_time=None,
-        pipeline=None,
-        return_midi_messages=False,
     ):
         threading.Thread.__init__(self)
-
         self.midi_in = port
         self.init_time = init_time
+        self.duration = 10
         self.listen = False
         self.queue = queue
-        self.first_msg = False
-        self.pipeline = pipeline
-        self.return_midi_messages = return_midi_messages
 
     def run(self):
         self.start_listening()
-        while self.listen:
+        self.queue = list()
+        print(self.current_time)
+        for msg in self.midi_in.iter_pending():
+            continue
+        while self.current_time < self.duration:
             msg = self.midi_in.poll()
             if msg is not None:
                 c_time = self.current_time
-                output = self.pipeline(msg, c_time)
-                if self.return_midi_messages:
-                    self.queue.put(((msg, c_time), output))
-                else:
-                    self.queue.put(output)
+                
+                self.queue.append((msg, c_time))
+                print(msg, c_time)
+        
+        
+        self.stop_listening()
+        return self.queue
+            
 
     @property
     def current_time(self):
         """
+
         Get current time since starting to listen
         """
-        return time.time() - self.init_time
+        return time.perf_counter() - self.init_time
 
     def start_listening(self):
         """
         Start listening to midi input (open input port and
         get starting time)
         """
+        print("start listening")
         self.listen = True
         if self.init_time is None:
-            self.init_time = time.time()
+            self.init_time = time.perf_counter()
 
     def stop_listening(self):
         """
         Stop listening to MIDI input
         """
+        print("stop listening")
         # break while loop in self.run
         self.listen = False
         # reset init time
@@ -300,14 +305,14 @@ class Sequencer(multiprocessing.Process):
         self.playhead = 0
         self.playing = False
         self.start_time = 0
-        self.tempo = 120
+        self.tempo = 6*8#120
         self.quarter_per_ns = self.tempo / ( 60 * 1e9)
         self.next_time = 0
 
         # music variables
         self.default_velocity = 60
         self.loop_start_quarter = 0
-        self.loop_end_quarter = 4
+        self.loop_end_quarter = 10
         self.looped_notes = None
         self.onset_quarter = None
         self.offset_quarter = None

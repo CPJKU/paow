@@ -176,6 +176,11 @@ class Progression:
         self.number_of_chords = number_of_chords
         self.id = randomword(10)
     
+    def copy(self):
+        return Progression(
+                number_of_chords = self.number_of_chords,
+                chords= self.chords
+                )
     
     def join(self, 
              another,
@@ -192,7 +197,7 @@ class Progression:
 
         new_progression = Progression(number_of_chords = self.number_of_chords)
         new_another_progression = Progression(number_of_chords = self.number_of_chords)
-        for k in range(8):
+        for k in range(self.number_of_chords):
             if k in idx:
                 new_progression.chords[k] = self.chords[k]
                 new_another_progression.chords[k] = another.chords[k]
