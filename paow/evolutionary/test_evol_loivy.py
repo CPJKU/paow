@@ -1,4 +1,4 @@
-from paow.evolutionary import Optimizer
+from paow.evolutionary import Optimizer, Optimizer2
 from paow.utils import partFromProgression, Sequencer, MidiRouter, MidiInputThread
 import numpy as np
 import multiprocessing
@@ -63,23 +63,37 @@ def recompute(note_array = None, e = 10):
             (4.464,2.71,59,100),
         ]
         note_array = np.array(rows, dtype=fields)
-    exp = Optimizer()
+    exp = Optimizer2()
     p, r = exp.run(melody=note_array, epochs = e)
     part = partFromProgression(p[0],quarter_duration = 4,rhythm = r)
-    return part
+    return part, r
+
+def st(s = None, re = False):
+    if s is None:
+        queue =multiprocessing.Queue()
+        s = Sequencer(queue=queue,outport_name="seq")
+        s.start()
+    else:
+        s.terminate()
+        s.join()
+        if re:
+            queue =multiprocessing.Queue()
+            s = Sequencer(queue=queue,outport_name="seq")
+            s.start()
+    return s
+
 
 if __name__ == "__main__":
 
-    queue =multiprocessing.Queue()
-    s = Sequencer(queue=queue,outport_name="seq")
     mr = MidiRouter(inport_name="inp")
     l = MidiInputThread(port = mr.input_port)
+    s = st()
 
-
-    # part = recompute(note_array)
+    # part, r = recompute(note_array)
     # note_array = rec(l)
+    # s.up(part)
+
 
     # s.start()
     # s.terminate()
     # s.join()
-    # s.up(part)

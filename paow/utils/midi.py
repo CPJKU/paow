@@ -6,6 +6,7 @@ import threading
 import multiprocessing
 from collections import defaultdict
 import partitura as pt
+import winsound
 
 
 class MidiInputThread(threading.Thread):
@@ -21,6 +22,7 @@ class MidiInputThread(threading.Thread):
         self.duration = 10
         self.listen = False
         self.queue = queue
+        self.beep_interval = self.duration / 8
 
     def run(self):
         self.start_listening()
@@ -28,13 +30,21 @@ class MidiInputThread(threading.Thread):
         print(self.current_time)
         for msg in self.midi_in.iter_pending():
             continue
-        while self.current_time < self.duration:
+        c_time = self.current_time
+        while c_time < 2.49:
+            if self.beep_interval is not None:
+                if c_time % self.beep_interval < 0.01 and c_time < 2.0:
+                    winsound.Beep(1000, 50)
+            c_time = self.current_time
+        while c_time < self.duration + 2.5:
             msg = self.midi_in.poll()
             if msg is not None:
-                c_time = self.current_time
-                
-                self.queue.append((msg, c_time))
-                print(msg, c_time)
+                self.queue.append((msg, c_time-2.5))
+                print(msg, c_time-2.5)
+            if self.beep_interval is not None:
+                if c_time % self.beep_interval < 0.01:
+                    winsound.Beep(262, 50)
+            c_time = self.current_time
         
         
         self.stop_listening()
@@ -305,14 +315,14 @@ class Sequencer(multiprocessing.Process):
         self.playhead = 0
         self.playing = False
         self.start_time = 0
-        self.tempo = 6*8#120
+        self.tempo = 120#120
         self.quarter_per_ns = self.tempo / ( 60 * 1e9)
         self.next_time = 0
 
         # music variables
         self.default_velocity = 60
         self.loop_start_quarter = 0
-        self.loop_end_quarter = 10
+        self.loop_end_quarter = 8
         self.looped_notes = None
         self.onset_quarter = None
         self.offset_quarter = None
@@ -351,6 +361,7 @@ class Sequencer(multiprocessing.Process):
 
         self.message_times = np.sort(np.array(list(self.messages.keys())))
         self.next_time = self.message_times[0]
+        print(self.message_times)
         
     def run(self):
         self.start_time = time.perf_counter_ns()
