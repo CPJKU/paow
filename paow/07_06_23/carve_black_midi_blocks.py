@@ -47,7 +47,6 @@ def sample_from_values(values, v_min, v_max, bins, number_of_samples, temp):
 # save the performance with note noise
 def save_current_stack(nas, filename, performance):
     full_note_array = rfn.stack_arrays(nas).data
-    # print(full_note_array, full_note_array[["pitch"]])
     pitch_sort_idx = np.argsort(full_note_array["pitch"])
     full_note_array = full_note_array[pitch_sort_idx]
     onset_sort_idx = np.argsort(full_note_array["onset_sec"], kind="mergesort")
@@ -82,8 +81,7 @@ for k in range(3):
             p_min = stime_to_ptime_map(ws)
             p_max = stime_to_ptime_map(ws+window_width)
             new_onsets = sample_from_values(m_score["p_onset"][mask], p_min, p_max, time_bins, number_of_notes, temperature)
-            # sample durtions
-            print(ws)
+            # sample durations
             new_durations = sample_from_values(m_score["p_duration"][mask], 0.001, dur_max, dur_bins, number_of_notes, temperature)
             # sample pitches
             # piano keyboard distribution 88 notes from 21 to 108
