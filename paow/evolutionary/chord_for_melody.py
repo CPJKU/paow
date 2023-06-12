@@ -164,7 +164,6 @@ class Optimizer2:
         # subpop2 = np.random.choice(population, 30)
         # for element0, element1 in zip(subpop1, subpop2):
         #     elnew1, elnew2 = element0.join(element1)
-        
         #     population.append(elnew1)
         #     population.append(elnew2)
         

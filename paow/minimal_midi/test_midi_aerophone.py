@@ -1,4 +1,7 @@
 import mido
+"""
+test the different control change message produced and accepted by the aerophone.
+"""
 
 print(mido.get_output_names(), mido.get_input_names())
 # if oport is not None:
@@ -15,7 +18,7 @@ def f(no, val):
 def g():
     for msg in iport:
         if msg.is_cc():
-            # 2 = breath, 3 too?, 11,9
+            # 2 = breath, 3 too?, 11, 9
             # 4 button
             if msg.control == 95:# in [2,3,9,11]: 
                 print(msg)

@@ -2,6 +2,10 @@ import mido
 import warnings
 import numpy as np
 
+"""
+force notes from aerophone to s predefined scale.
+"""
+
 def scalify(input_array, 
             offset = 0, 
             scale = np.array([0,0,2,3,3,5,5,7,7,9,10,10])):
@@ -32,7 +36,6 @@ def g():
 
             # start note if it's a 'note on' event with velocity > 0
             if note_on and msg.velocity > 0:
-
 
                 repitch = scalify(pitch-12)
                 # save the onset time and velocity

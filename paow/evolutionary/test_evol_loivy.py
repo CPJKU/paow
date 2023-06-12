@@ -70,7 +70,7 @@ def recompute(note_array = None, e = 10):
 
 def st(s = None, re = False):
     if s is None:
-        queue =multiprocessing.Queue()
+        queue = multiprocessing.Queue()
         s = Sequencer(queue=queue,outport_name="seq")
         s.start()
     else:

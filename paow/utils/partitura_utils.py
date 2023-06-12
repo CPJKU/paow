@@ -61,6 +61,7 @@ def parttimefromrekorder(na,
     na["duration_sec"][na["duration_sec"] < 1] = 1   
     return na, frames
 
+
 def addmelody2part(part, na, quarter_duration = 4):
     for j, note in enumerate(na):
             addnote(note["pitch"], part, j, 
