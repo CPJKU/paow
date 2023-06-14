@@ -1,0 +1,24 @@
+name: paow_2023_06_14
+
+channels:
+  - defaults
+  - pytorch
+
+dependencies:
+  - python=3.9
+  - pytorch::pytorch
+  - torchvision
+  - torchaudio
+  - numpy
+  - scipy
+  - matplotlib
+  - ipython
+  - jupyter
+  - pip
+  - tqdm
+
+  - pip:
+    - appdirs
+    - soundfile
+    - partitura
+    - pandas_ods_reader
