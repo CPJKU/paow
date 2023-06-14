@@ -6,7 +6,7 @@ The initial installment of this series explores one of the most fundamental, yet
 
 Instead of just having the Dikslavier play like a machine, we explore the question what it means to play like a human by using an AI model trained to play expressively like a human to generate an **expressive** performance of the Hanon. This experiment aims to highlight our conception of what an expressive performance is, as well as the limitations of generative AI systems that imitate the way humans perform a specific task.
 
-In this experiment, we use the [Basis Mixer](http://www.carloscancinochacon.com/documents/thesis/Cancino-JKU-2018.pdf), a neural  network-based model that renders a human like performance of a piece of music given its score, in terms of variations in dynamics, tempo, timing and articulation. This Basis Mixer was trained on a corpus of performances of (nearly) the entire solo piano ouvre by [Frédéric Chopin](https://en.wikipedia.org/wiki/Frédéric_Chopin) played by [Nikita Magaloff](https://en.wikipedia.org/wiki/Nikita_Magaloff), one of the last "Romantic" pianists of the 20th Century.
+In this experiment, we use the [Basis Mixer](http://www.carloscancinochacon.com/documents/thesis/Cancino-JKU-2018.pdf), a neural  network-based model that renders a human like performance of a piece of music given its score, in terms of variations in dynamics, tempo, timing and articulation. This Basis Mixer was trained on a corpus of performances of (nearly) the entire solo piano oeuvre by [Frédéric Chopin](https://en.wikipedia.org/wiki/Frédéric_Chopin) played by [Nikita Magaloff](https://en.wikipedia.org/wiki/Nikita_Magaloff), one of the last "Romantic" pianists of the 20th Century.
 
 
 ## Generation environment
