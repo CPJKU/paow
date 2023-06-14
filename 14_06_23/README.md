@@ -11,13 +11,13 @@ In this experiment, we use the [Basis Mixer](http://www.carloscancinochacon.com/
 
 ## Generation environment
 
-Python 3.9
-mido / python-rtmidi
-numpy
-pytorch
-partitura
-basismixer
-https://github.com/CPJKU/paow/tree/main/paow/14_06_23
+* Python 3.9
+* mido / python-rtmidi
+* numpy
+* pytorch
+* partitura
+* basismixer
+* https://github.com/CPJKU/paow/tree/main/paow/14_06_23
 
 ## Technical equipment
 
