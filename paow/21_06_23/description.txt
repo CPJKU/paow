@@ -12,6 +12,15 @@ ATEPP: https://github.com/BetsyTang/ATEPP/tree/master/piano_transcription-master
 PAOW: https://github.com/CPJKU/paow/tree/main/paow/21_06_23
 
 
+Original performances:
+
+Scarlatti: https://www.youtube.com/watch?v=-LHY6K190sU
+Mozart: https://www.youtube.com/watch?v=J5kEQsv2snE
+Schumann: https://www.youtube.com/watch?v=7IOHYrOY3Ug
+Ravel: https://www.youtube.com/watch?v=lFkzib97tas
+Prokofiev: https://www.youtube.com/watch?v=adXWxTu3Wn0
+
+
 References:
 
 [Zhang et al.]: https://archives.ismir.net/ismir2022/paper/000053.pdf
