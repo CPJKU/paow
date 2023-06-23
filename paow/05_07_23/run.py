@@ -8,32 +8,68 @@ import tempfile
 import audiofile
 from audiomentations import Compose, AddGaussianNoise, TimeStretch, PitchShift, Shift
 import zipfile
+import pyaudio
+import wave
+import threading
+
+
+class AudioFile:
+    chunk = 1024
+
+    def __init__(self, file):
+        """ Init audio stream """
+        self.wf = wave.open(file, 'rb')
+        self.p = pyaudio.PyAudio()
+        self.stream = self.p.open(
+            format = self.p.get_format_from_width(self.wf.getsampwidth()),
+            channels = self.wf.getnchannels(),
+            rate = self.wf.getframerate(),
+            output = True,
+        )
+
+    def play(self):
+        """ Play entire file """
+        data = self.wf.readframes(self.chunk)
+        while data != b'':
+            self.stream.write(data)
+            data = self.wf.readframes(self.chunk)
+
+    def close(self):
+        """ Graceful shutdown """
+        self.stream.close()
+        self.p.terminate()
 
 
 
 grammar = {
-    "Pattern" : [["P1", "A1", "D1", "W1"], ["P2", "A2", "D2", "W2"], ["P3", "A3", "D3", "W3"]],
+    "Pattern" : [["P1", "A1", "D1", "W1"], ["P2", "A2", "D2", "W2"], ["P3", "A3", "D3", "W3"], ["P4", "A4", "D4", "W4"]],
     "P1": np.array([67, 75, 71, 78, 77, 88]),
     "P2": np.array([27, 98, 62, 55, 71, 63]),
+    "P4": np.array([27, 98, 62, 55, 71, 63]),
     "P3": np.array([55, 62, 69, 76, 81, 82, 88]),
+    "P4": np.array([27, 100]),
     "A1": np.array([30, 30, 30, 30, 30, 30]),
     "A2": np.array([20, 20, 20, 20, 20, 20]),
     "A3": np.array([20, 20, 20, 20, 20, 20, 20]),
+    "A4": np.array([20, 20]),
     "D1": np.array([300, 300, 300, 300, 300, 300]),
     "D2": np.array([4000, 4000, 3000, 3000, 3000, 3000]),
     "D3": np.array([3000, 3000, 3000, 3000, 3000, 3000, 3000]),
+    "D4": np.array([3000, 3000]),
     "W1": np.array([800, 800, 800, 800, 800, 800]),
     "W2": np.array([0, 5000, 0, 0, 0, 3000]),
-    "W3": np.array([100, 100, 100, 100, 100, 100, 3000])
+    "W3": np.array([100, 100, 100, 100, 100, 100, 3000]),
+    "W4": np.array([0, 3000])
+
 }
 
 def audio_grammar(main_path):
-    path1 = os.path.join(main_path, "X")
-    path2 = os.path.join(main_path, "Y")
-    path3 = os.path.join(main_path, "Z")
-    one = os.listdir(path1)
-    two = os.listdir(path2)
-    three = os.listdir(path3)
+    path1 = os.path.join(main_path, "T1")
+    path2 = os.path.join(main_path, "T2")
+    path3 = os.path.join(main_path, "T3")
+    one = list(map(lambda x: os.path.join(path1, x), os.listdir(path1)))
+    two = list(map(lambda x: os.path.join(path2, x), os.listdir(path2)))
+    three = list(map(lambda x: os.path.join(path3, x), os.listdir(path3)))
     grammar = {
         "Type": ["T1", "T2", "T3"],
         "T1": one,
@@ -88,7 +124,7 @@ def generate_grammar(grammar, memory, mem_length=10):
     return perturbation(p, a, d, w), memory
 
 
-def generate_audio_grammar(grammar, memory, effects, mem_length=10):
+def generate_audio_grammar(grammar, effects, memory=[], mem_length=10):
     """Generate a pattern from the grammar"""
     if len(memory) == 0:
         # first pattern
@@ -98,7 +134,20 @@ def generate_audio_grammar(grammar, memory, effects, mem_length=10):
         weights = np.arange(len(memory) + len(grammar["Type"]))
         pattern = random.choices(memory+grammar["Type"], weights=weights)[0]
 
-    audio_clip, parameters = random.choice(grammar[pattern])
+    audio_clip = random.choice(grammar[pattern])
+    parameters = {
+        "min_amplitude": 0.001,
+        "max_amplitude": 0.015,
+        "min_rate": 0.8,
+        "max_rate": 1.2,
+        "min_semitones": -4,
+        "max_semitones": 4,
+        "min_fraction": -0.5,
+        "max_fraction": 0.5,
+        "p": 0.5
+
+    }
+    return audio_clip
 
     parameters = audio_param_perturbation(parameters)
     path = effects.apply_effect(audio_clip, parameters)
@@ -145,7 +194,7 @@ def generate_and_send_midi(music_grammar, port_name, generation_length=3600, mem
             time.sleep(w[i]/1000)
         # Wait for the next generation
         ########
-        time.sleep(2)
+        time.sleep(random.randint(1, 50)*0.1)
 
 
     # Close port
@@ -155,21 +204,29 @@ def generate_and_send_midi(music_grammar, port_name, generation_length=3600, mem
         port.send(msg)
         port.close()
 
+def play_clip(audio_path):
+    a = AudioFile(audio_path)
+    a.play()
+    a.close()
+
 
 class AudioMixing:
     """
     Receives audio clips real time and plays them in a single stereo out.
     """
     def __init__(self, total_duration=3600, samplerate=44100, chunksize=1024, stereo=True):
-        swmixer.init(samplerate=samplerate, chunksize=chunksize, stereo=stereo)
-        swmixer.start()
         self.total_duration = total_duration
 
     def add_clip(self, audio_path, volume=0.5, time_until_next=60):
-        if time_until_next - self.total_duration > 0:
-            s = swmixer.StreamingSound(audio_path)
-            s.play(volume=volume)
-            self.total_duration -= time_until_next
+        if time_until_next - self.total_duration < 0:
+            # start a new process thread
+            # play the clip
+            play_clip(audio_path)
+            # t = threading.Thread(target=play_clip, args=(audio_path))
+            # t.start()
+
+
+
 
 
 class EffectClass:
@@ -195,27 +252,44 @@ class EffectClass:
 
 
 class GrammarGeneration:
-    def __init__(self, output_midi_port="iM/ONE 1", generation_length=60, mem_length=10, ):
+    def __init__(self, output_midi_port="iM/ONE 1", generation_length=3600, mem_length=10, ):
         # Download audio files
         save_path = self.download_files()
         # Initialize Audio
         self.mixer = AudioMixing(total_duration=generation_length)
         # Initialize Audio grammar
         self.audio_grammar = audio_grammar(save_path)
-        # Generate and send midi
-        generate_and_send_midi(grammar, port_name=output_midi_port, generation_length=3600, mem_length=10, test=False)
+
+        # Initialize thread for midi generation
+        self.midi_thread = threading.Thread(target=generate_and_send_midi, args=(grammar, output_midi_port, generation_length, 10, False))
+        # Initialize effects
+        effects = EffectClass()
+
+        # Start midi generation
+        self.midi_thread.start()
+        start_time = time.time()
+        while time.time() - start_time < generation_length:
+            # Generate audio clip
+            audio_clip = generate_audio_grammar(self.audio_grammar, effects)
+            # Add to mixer
+            self.mixer.add_clip(audio_clip, volume=0.5, time_until_next=60)
+            time.sleep(10)
+
 
     def download_files(self):
-        import urllib
-        url = ""
-        testfile = urllib.URLopener()
-        save_path = os.path.join(os.path.dirname(__file__), "audio_files.zip")
-        testfile.retrieve(url, save_path)
-        # unzip files
-        with zipfile.ZipFile(save_path, 'r') as zip_ref:
-            zip_ref.extractall(os.path.dirname(__file__))
-        return os.path.dirname(__file__)
 
+        url = ""
+        if not os.path.exists(os.path.join(os.path.dirname(__file__), "audio_files")):
+            import requests
+            save_path = os.path.join(os.path.dirname(__file__), "audio_files.zip")
+            r = requests.get(url, stream=True)
+            with open(save_path, 'wb') as fd:
+                for chunk in r.iter_content(chunk_size=128):
+                    fd.write(chunk)
+            # unzip files
+            with zipfile.ZipFile(save_path, 'r') as zip_ref:
+                zip_ref.extractall(os.path.dirname(__file__))
+        return os.path.join(os.path.dirname(__file__), "audio_files")
 
 
 if __name__ == "__main__":
