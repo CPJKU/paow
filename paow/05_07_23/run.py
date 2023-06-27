@@ -232,7 +232,7 @@ class EffectClass:
 
     def select_effect(self, params):
         effect = Compose([
-            AddGaussianNoise(min_amplitude=params["min_amplitude"], max_amplitude=params["max_amplitude"], p=params["p"]),
+            # AddGaussianNoise(min_amplitude=params["min_amplitude"], max_amplitude=params["max_amplitude"], p=params["p"]),
             TimeStretch(min_rate=params["min_rate"], max_rate=params["max_rate"], p=params["p"]),
             PitchShift(min_semitones=params["min_semitones"], max_semitones=params["max_semitones"], p=params["p"]),
             Shift(min_fraction=params["min_fraction"], max_fraction=params["max_fraction"], p=params["p"])
@@ -277,16 +277,17 @@ class GrammarGeneration:
                 zip_ref.extractall(os.path.dirname(__file__))
         return os.path.join(os.path.dirname(__file__), "audio_files")
 
-    def generate_background_audio(self, save_path, generation_length):
+    def generate_background_audio(self, save_path, generation_length, sr=48000):
         # Initialize numpy array with gaussian noise
-        x = np.random.normal(0, 1, generation_length * 48000)
+        x = np.random.normal(0, 1, generation_length * sr)
         # Filter out values lower than 0.9 to create random impulse responses
-        x[x < 0.9] = 0
-        # Create filter of sawtoothe impulse response
-        b = np.linspace(1, 0, 50, endpoint=False)
+        x[x < 4.] = 0
+        # Create filter of sawtooth impulse response
+        b = np.linspace(1, 0, sr//4, endpoint=False)
         s = signal.lfilter(b, [1], x)
         # Normalize s between -1 and 1
         s = s / np.max(np.abs(s))
+
         # Apply other audio effects
         effects = Compose([
             AddGaussianNoise(min_amplitude=0.001, max_amplitude=0.01, p=0.5),
@@ -296,32 +297,42 @@ class GrammarGeneration:
             TimeMask(min_band_part=0.01, max_band_part=0.1, fade=False, p=0.5),
         ])
         # Apply effects
-        s = effects(s, 48000)
+        s = effects(s, sr)
+        # Do a Fade-in of 1s
+        ramp = np.ones(s.shape, dtype=float)
+        ramp[:sr] = np.linspace(0., 1., sr)
+        s = s * ramp
         # Save audio file
         audiofile.write(os.path.join(save_path, "background.wav"), s, 48000)
+        # ApplyImpulseResponse(os.path.join(save_path, "background.wav"), p=0.5)
         return os.path.join(save_path, "background.wav")
 
     def start_audio_generation(self):
         CHUNK = 1024
         wf = wave.open(self.background_audio_path, 'rb')
         p = pyaudio.PyAudio()
+
+
         background_stream = p.open(
             format=p.get_format_from_width(wf.getsampwidth()),
             channels=wf.getnchannels(),
             rate=wf.getframerate(),
-            output=True)
+            output=True,
+        )
         audio_stream = p.open(
-            format=p.get_format_from_width(pyaudio.paInt16), channels=1, rate=48000, output=True)
+            format=p.get_format_from_width(wf.getsampwidth()), channels=1, rate=48000, output=True)
 
         background_data = wf.readframes(CHUNK)
-        running_audio_data = ""
+        running_audio_data = b''
 
-        while background_data != '':
+        while background_data != b'':
             background_stream.write(background_data)
             background_data = wf.readframes(CHUNK)
-            if running_audio_data == "":
-                wf_audio = generate_audio_grammar(self.audio_grammar, self.effects)
-                if random.randint(0, 100) < 50:
+            if running_audio_data == b'':
+                audio_path = generate_audio_grammar(self.audio_grammar, self.effects)
+                wf_audio = wave.open(audio_path, 'rb')
+                if random.randint(0, 100) < 80:
+                    print("Playing audio clip.")
                     running_audio_data = wf_audio.readframes(CHUNK)
             else:
                 audio_stream.write(running_audio_data)
@@ -338,7 +349,7 @@ class GrammarGeneration:
 
 if __name__ == "__main__":
     # Download Audio clips.
-    GrammarGeneration()
+    GrammarGeneration(generation_length=120)
 
 
 
