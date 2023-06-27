@@ -6,11 +6,12 @@ import swmixer
 import os
 import tempfile
 import audiofile
-from audiomentations import Compose, AddGaussianNoise, TimeStretch, PitchShift, Shift
+from audiomentations import Compose, AddGaussianNoise, TimeStretch, PitchShift, Shift, AirAbsorption, ApplyImpulseResponse, TimeMask, GainTransition
 import zipfile
 import pyaudio
 import wave
 import threading
+from scipy import signal
 
 
 class AudioFile:
@@ -175,26 +176,33 @@ def generate_and_send_midi(music_grammar, port_name, generation_length=3600, mem
     start_time = time.time()
     memory = list()
     while time.time() - start_time < generation_length:
-        (p, a, d, w), memory = generate_grammar(music_grammar, memory, mem_length)
-        # Generate midi message
-        ########
-        # Send midi message
-        for i in range(len(p)):
-            if test:
-                print("Note: {}, Velocity: {}, Duration: {}".format(p[i], a[i], d[i]))
-                continue
-            msg = mido.Message('note_on', note=int(p[i]), velocity=int(a[i]), time=0)
-            port.send(msg)
-            print(msg)
-            msg = mido.Message('note_off', note=int(p[i]), velocity=int(a[i]), time=int(d[i]))
-            port.send(msg)
+        try:
+            (p, a, d, w), memory = generate_grammar(music_grammar, memory, mem_length)
+            # Generate midi message
+            ########
+            # Send midi message
+            for i in range(len(p)):
+                if test:
+                    print("Note: {}, Velocity: {}, Duration: {}".format(p[i], a[i], d[i]))
+                    continue
+                msg = mido.Message('note_on', note=int(p[i]), velocity=int(a[i]), time=0)
+                port.send(msg)
+                print(msg)
+                msg = mido.Message('note_off', note=int(p[i]), velocity=int(a[i]), time=int(d[i]))
+                port.send(msg)
 
-            # Wait for the next note
-            time.sleep(w[i]/1000)
-        # Wait for the next generation
-        ########
-        time.sleep(random.randint(1, 50)*0.1)
-
+                # Wait for the next note
+                time.sleep(w[i] / 1000)
+            # Wait for the next generation
+            ########
+            time.sleep(random.randint(1, 50) * 0.1)
+        except KeyboardInterrupt:
+            if not test:
+                # Release the pedal
+                msg = mido.Message('control_change', control=64, value=0)
+                port.send(msg)
+                port.close()
+            raise ValueError("Interrupted by user")
 
     # Close port
     if not test:
@@ -202,30 +210,6 @@ def generate_and_send_midi(music_grammar, port_name, generation_length=3600, mem
         msg = mido.Message('control_change', control=64, value=0)
         port.send(msg)
         port.close()
-
-def play_clip(audio_path):
-    a = AudioFile(audio_path)
-    a.play()
-    a.close()
-
-
-class AudioMixing:
-    """
-    Receives audio clips real time and plays them in a single stereo out.
-    """
-    def __init__(self, total_duration=3600, samplerate=44100, chunksize=1024, stereo=True):
-        self.total_duration = total_duration
-
-    def add_clip(self, audio_path, volume=0.5, time_until_next=60):
-        if time_until_next - self.total_duration < 0:
-            # start a new process thread
-            # play the clip
-            play_clip(audio_path)
-            # t = threading.Thread(target=play_clip, args=(audio_path))
-            # t.start()
-
-
-
 
 
 class EffectClass:
@@ -260,26 +244,23 @@ class GrammarGeneration:
     def __init__(self, output_midi_port="iM/ONE 1", generation_length=3600, mem_length=10, ):
         # Download audio files
         save_path = self.download_files()
-        # Initialize Audio
-        self.mixer = AudioMixing(total_duration=generation_length)
+        # Initialize Background Audio
+        self.background_audio_path = self.generate_background_audio(save_path, generation_length)
+
+
         # Initialize Audio grammar
         self.audio_grammar = audio_grammar(save_path)
 
         # Initialize thread for midi generation
         self.midi_thread = threading.Thread(target=generate_and_send_midi, args=(grammar, output_midi_port, generation_length, 10, False))
         # Initialize effects
-        effects = EffectClass()
+        self.effects = EffectClass()
 
         # Start midi generation
         self.midi_thread.start()
-        start_time = time.time()
-        while time.time() - start_time < generation_length:
-            # Generate audio clip
-            audio_clip = generate_audio_grammar(self.audio_grammar, effects)
-            # Add to mixer
-            self.mixer.add_clip(audio_clip, volume=0.5, time_until_next=60)
-            time.sleep(10)
 
+        # Start audio generation
+        self.start_audio_generation()
 
     def download_files(self):
 
@@ -295,6 +276,64 @@ class GrammarGeneration:
             with zipfile.ZipFile(save_path, 'r') as zip_ref:
                 zip_ref.extractall(os.path.dirname(__file__))
         return os.path.join(os.path.dirname(__file__), "audio_files")
+
+    def generate_background_audio(self, save_path, generation_length):
+        # Initialize numpy array with gaussian noise
+        x = np.random.normal(0, 1, generation_length * 48000)
+        # Filter out values lower than 0.9 to create random impulse responses
+        x[x < 0.9] = 0
+        # Create filter of sawtoothe impulse response
+        b = np.linspace(1, 0, 50, endpoint=False)
+        s = signal.lfilter(b, [1], x)
+        # Normalize s between -1 and 1
+        s = s / np.max(np.abs(s))
+        # Apply other audio effects
+        effects = Compose([
+            AddGaussianNoise(min_amplitude=0.001, max_amplitude=0.01, p=0.5),
+            # ApplyImpulseResponse(, p=0.5),
+            AirAbsorption(min_temperature=10, max_temperature=20, p=0.5),
+            GainTransition(min_gain_in_db=-20, max_gain_in_db=0, p=0.5),
+            TimeMask(min_band_part=0.01, max_band_part=0.1, fade=False, p=0.5),
+        ])
+        # Apply effects
+        s = effects(s, 48000)
+        # Save audio file
+        audiofile.write(os.path.join(save_path, "background.wav"), s, 48000)
+        return os.path.join(save_path, "background.wav")
+
+    def start_audio_generation(self):
+        CHUNK = 1024
+        wf = wave.open(self.background_audio_path, 'rb')
+        p = pyaudio.PyAudio()
+        background_stream = p.open(
+            format=p.get_format_from_width(wf.getsampwidth()),
+            channels=wf.getnchannels(),
+            rate=wf.getframerate(),
+            output=True)
+        audio_stream = p.open(
+            format=p.get_format_from_width(pyaudio.paInt16), channels=1, rate=48000, output=True)
+
+        background_data = wf.readframes(CHUNK)
+        running_audio_data = ""
+
+        while background_data != '':
+            background_stream.write(background_data)
+            background_data = wf.readframes(CHUNK)
+            if running_audio_data == "":
+                wf_audio = generate_audio_grammar(self.audio_grammar, self.effects)
+                if random.randint(0, 100) < 50:
+                    running_audio_data = wf_audio.readframes(CHUNK)
+            else:
+                audio_stream.write(running_audio_data)
+                running_audio_data = wf_audio.readframes(CHUNK)
+
+        background_stream.stop_stream()
+        audio_stream.stop_stream()
+
+        background_stream.close()
+        audio_stream.close()
+
+        p.terminate()
 
 
 if __name__ == "__main__":
