@@ -147,8 +147,7 @@ def generate_audio_grammar(grammar, effects, memory=[], mem_length=10):
         "p": 0.5
 
     }
-    return audio_clip
-
+    # return audio_clip
     parameters = audio_param_perturbation(parameters)
     path = effects.apply_effect(audio_clip, parameters)
     return path
@@ -236,19 +235,25 @@ class EffectClass:
 
     def apply_effect(self, audio_path, params):
         signal, sampling_rate = audiofile.read(audio_path)
-        signal = self.select_effect(params)
-        out = self.effect(signal, sampling_rate)
-        fp = tempfile.TemporaryFile()
+        # reverse signal
+        signal = np.flip(signal) if random.gauss(mu=0, sigma=1) > 0.6 else signal
+        # normalize signal
+        # signal = signal/signal.max()
+        effect = self.select_effect(params)
+        out = effect(signal, sampling_rate)
+        # fp = tempfile.TemporaryFile(dir=".",suffix=".wav")
+        fp = os.path.join(os.path.dirname(__file__), "temp.wav")
         audiofile.write(fp, out, sampling_rate)
         return fp
 
     def select_effect(self, params):
-        self.effect = Compose([
+        effect = Compose([
             AddGaussianNoise(min_amplitude=params["min_amplitude"], max_amplitude=params["max_amplitude"], p=params["p"]),
             TimeStretch(min_rate=params["min_rate"], max_rate=params["max_rate"], p=params["p"]),
             PitchShift(min_semitones=params["min_semitones"], max_semitones=params["max_semitones"], p=params["p"]),
             Shift(min_fraction=params["min_fraction"], max_fraction=params["max_fraction"], p=params["p"])
         ])
+        return effect
 
 
 class GrammarGeneration:
