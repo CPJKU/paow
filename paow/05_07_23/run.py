@@ -2,9 +2,7 @@ import numpy as np
 import mido
 import random
 import time
-import swmixer
 import os
-import tempfile
 import audiofile
 from audiomentations import Compose, AddGaussianNoise, TimeStretch, PitchShift, Shift, AirAbsorption, ApplyImpulseResponse, TimeMask, GainTransition
 import zipfile
@@ -97,8 +95,29 @@ def perturbation(p, a, d, w):
 
 
 def audio_param_perturbation(parameters):
-    new_parameters = parameters
-    return parameters
+    """Perturb the parameters of the audio file"""
+    new_parameters = {}
+    for key, value in parameters.items():
+        if key == "min_amplitude":
+            # sample from a gaussian distribution
+            new_min_amplitude = np.random.normal(value, 0.1)
+            new_parameters[key] = new_min_amplitude if new_min_amplitude > 0 else 0
+            new_parameters["max_amplitude"] = new_parameters["min_amplitude"] + 0.1
+        if key == "min_rate":
+            new_min_rate = np.random.normal(value, 1.)
+            new_parameters[key] = new_min_rate if new_min_rate > 0 else 0.5
+            max_rate = np.random.normal(value, 1.)
+            max_rate = max_rate if max_rate > 0 else 0
+            new_parameters["max_rate"] = new_parameters["min_rate"] + max_rate
+        if key == "min_semitones":
+            new_parameters[key] = -np.random.randint(0, 24)
+        if key == "max_semitones":
+            new_parameters[key] = np.random.randint(0, 24)
+        if key == "min_fraction":
+            new_parameters[key] = - np.random.uniform(0., 1.)
+        if key == "max_fraction":
+            new_parameters[key] = np.random.uniform(0., 1.)
+    return new_parameters
 
 
 def generate_grammar(grammar, memory, mem_length=10):
@@ -125,7 +144,7 @@ def generate_grammar(grammar, memory, mem_length=10):
     return perturbation(p, a, d, w), memory
 
 
-def generate_audio_grammar(grammar, effects, memory=[], mem_length=10):
+def generate_audio_grammar(grammar, effects, memory=[], mem_length=10, mode=1):
     """Generate a pattern from the grammar"""
     if len(memory) == 0:
         # first pattern
@@ -150,12 +169,12 @@ def generate_audio_grammar(grammar, effects, memory=[], mem_length=10):
         "max_semitones": 4,
         "min_fraction": -0.5,
         "max_fraction": 0.5,
-        "p": 0.5
-
+        "p": 0.5,
+        "volume": 1.0
     }
     # return audio_clip
     parameters = audio_param_perturbation(parameters)
-    path = effects.apply_effect(audio_clip, parameters)
+    path = effects.apply_effect(audio_clip, parameters, mode)
     return path, memory
 
 
@@ -222,7 +241,7 @@ class EffectClass:
     def __init__(self, sample_rate=44100):
         self.sample_rate = sample_rate
 
-    def apply_effect(self, audio_path, params):
+    def apply_effect(self, audio_path, params, mode):
         signal, sampling_rate = audiofile.read(audio_path)
         # reverse signal
         signal = np.flip(signal) if random.gauss(mu=0, sigma=1) > 0.6 else signal
@@ -230,8 +249,10 @@ class EffectClass:
         # signal = signal/signal.max()
         effect = self.select_effect(params)
         out = effect(signal, sampling_rate)
-        # fp = tempfile.TemporaryFile(dir=".",suffix=".wav")
-        fp = os.path.join(os.path.dirname(__file__), "temp.wav")
+        # adjust volume
+        out = out*params["volume"]
+
+        fp = os.path.join(os.path.dirname(__file__), "temp-{}.wav".format(mode))
         audiofile.write(fp, out, sampling_rate)
         return fp
 
@@ -354,7 +375,7 @@ class GrammarGeneration:
             background_stream.write(background_data)
             background_data = wf.readframes(CHUNK)
             if running_audio_data == b'':
-                audio_path, audio_memory = generate_audio_grammar(self.audio_grammar, self.effects, audio_memory)
+                audio_path, audio_memory = generate_audio_grammar(self.audio_grammar, self.effects, audio_memory, self.mem_length, mode=1)
                 wf_audio = wave.open(audio_path, 'rb')
                 if random.randint(0, 100) < 80:
                     print("Playing audio clip.")
@@ -364,7 +385,7 @@ class GrammarGeneration:
                 running_audio_data = wf_audio.readframes(CHUNK)
 
             if running_audio_data_p == b'':
-                audio_path, audio_memory = generate_audio_grammar(self.audio_grammar, self.effects, audio_memory)
+                audio_path, audio_memory = generate_audio_grammar(self.audio_grammar, self.effects, audio_memory, self.mem_length, mode=2)
                 wf_audio_p = wave.open(audio_path, 'rb')
                 if random.randint(0, 100) < 80:
                     print("Playing audio clip.")
