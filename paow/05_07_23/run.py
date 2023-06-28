@@ -134,6 +134,11 @@ def generate_audio_grammar(grammar, effects, memory=[], mem_length=10):
         # weight more recent patterns
         weights = np.arange(len(memory) + len(grammar["Type"]))
         pattern = random.choices(memory+grammar["Type"], weights=weights)[0]
+    # add to memory
+    memory.append(pattern)
+    # last element remove from memory if it exceeds size
+    if len(memory) > mem_length:
+        memory.pop(-1)
 
     audio_clip = random.choice(grammar[pattern])
     parameters = {
@@ -151,7 +156,7 @@ def generate_audio_grammar(grammar, effects, memory=[], mem_length=10):
     # return audio_clip
     parameters = audio_param_perturbation(parameters)
     path = effects.apply_effect(audio_clip, parameters)
-    return path
+    return path, memory
 
 
 def generate_and_send_midi(music_grammar, port_name, generation_length=3600, mem_length=10, test=False):
@@ -242,10 +247,13 @@ class EffectClass:
 
 class GrammarGeneration:
     def __init__(self, output_midi_port="iM/ONE 1", generation_length=3600, mem_length=10, ):
+        self.generation_length = generation_length
+        self.mem_length = mem_length
+        self.output_midi_port = output_midi_port
         # Download audio files
         save_path = self.download_files()
         # Initialize Background Audio
-        self.background_audio_path = self.generate_background_audio(save_path, generation_length)
+        self.background_audio_path = self.generate_background_audio(save_path)
 
 
         # Initialize Audio grammar
@@ -277,9 +285,13 @@ class GrammarGeneration:
                 zip_ref.extractall(os.path.dirname(__file__))
         return os.path.join(os.path.dirname(__file__), "audio_files")
 
-    def generate_background_audio(self, save_path, generation_length, sr=48000):
+    def generate_background_audio(self, save_path, sr=48000):
+        # Fixed background audio time in seconds (5 minutes)
+        fixed_backround_audio_time = 5*60
+        fixed_backround_audio_time = fixed_backround_audio_time if fixed_backround_audio_time < self.generation_length else self.generation_length
+
         # Initialize numpy array with gaussian noise
-        x = np.random.normal(0, 1, generation_length * sr)
+        x = np.random.normal(0, 1, fixed_backround_audio_time * sr)
         # Filter out values lower than 0.9 to create random impulse responses
         x[x < 4.] = 0
         # Create filter of sawtooth impulse response
@@ -322,14 +334,27 @@ class GrammarGeneration:
         audio_stream = p.open(
             format=p.get_format_from_width(wf.getsampwidth()), channels=1, rate=48000, output=True)
 
+        audio_stream_p = p.open(
+            format=p.get_format_from_width(wf.getsampwidth()), channels=1, rate=48000, output=True
+        )
+
         background_data = wf.readframes(CHUNK)
         running_audio_data = b''
+        running_audio_data_p = b''
+        start_time = time.time()
+        audio_memory = []
 
-        while background_data != b'':
+        while time.time() - start_time < self.generation_length:
+            # If background audio is finished, rewind
+            # Background audio is 5 minutes long to reduce memory and cpu usage
+            if background_data == b'':
+                wf.rewind()
+                background_data = wf.readframes(CHUNK)
+
             background_stream.write(background_data)
             background_data = wf.readframes(CHUNK)
             if running_audio_data == b'':
-                audio_path = generate_audio_grammar(self.audio_grammar, self.effects)
+                audio_path, audio_memory = generate_audio_grammar(self.audio_grammar, self.effects, audio_memory)
                 wf_audio = wave.open(audio_path, 'rb')
                 if random.randint(0, 100) < 80:
                     print("Playing audio clip.")
@@ -338,11 +363,24 @@ class GrammarGeneration:
                 audio_stream.write(running_audio_data)
                 running_audio_data = wf_audio.readframes(CHUNK)
 
+            if running_audio_data_p == b'':
+                audio_path, audio_memory = generate_audio_grammar(self.audio_grammar, self.effects, audio_memory)
+                wf_audio_p = wave.open(audio_path, 'rb')
+                if random.randint(0, 100) < 80:
+                    print("Playing audio clip.")
+                    running_audio_data = wf_audio_p.readframes(CHUNK)
+            else:
+                audio_stream.write(running_audio_data_p)
+                running_audio_data = wf_audio_p.readframes(CHUNK)
+
+
         background_stream.stop_stream()
         audio_stream.stop_stream()
+        audio_stream_p.stop_stream()
 
         background_stream.close()
         audio_stream.close()
+        audio_stream_p.close()
 
         p.terminate()
 
