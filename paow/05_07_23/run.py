@@ -101,22 +101,26 @@ def audio_param_perturbation(parameters):
         if key == "min_amplitude":
             # sample from a gaussian distribution
             new_min_amplitude = np.random.normal(value, 0.1)
-            new_parameters[key] = new_min_amplitude if new_min_amplitude > 0 else 0
+            new_parameters[key] = new_min_amplitude if new_min_amplitude > 0 else 0.001
             new_parameters["max_amplitude"] = new_parameters["min_amplitude"] + 0.1
         if key == "min_rate":
             new_min_rate = np.random.normal(value, 1.)
-            new_parameters[key] = new_min_rate if new_min_rate > 0 else 0.5
+            new_parameters[key] = new_min_rate if new_min_rate > 0.1 else 0.5
             max_rate = np.random.normal(value, 1.)
             max_rate = max_rate if max_rate > 0 else 0
             new_parameters["max_rate"] = new_parameters["min_rate"] + max_rate
         if key == "min_semitones":
-            new_parameters[key] = -np.random.randint(0, 24)
+            new_parameters[key] = -np.random.randint(0, 12)
         if key == "max_semitones":
-            new_parameters[key] = np.random.randint(0, 24)
+            new_parameters[key] = np.random.randint(0, 12)
         if key == "min_fraction":
             new_parameters[key] = - np.random.uniform(0., 1.)
         if key == "max_fraction":
             new_parameters[key] = np.random.uniform(0., 1.)
+        if key == "p":
+            new_parameters[key] = np.random.uniform(0., 1.)
+        if key == "volume":
+            new_parameters[key] = np.random.uniform(0.5, 1.)
     return new_parameters
 
 
@@ -251,6 +255,11 @@ class EffectClass:
         out = effect(signal, sampling_rate)
         # adjust volume
         out = out*params["volume"]
+        # do a fade in and fade out
+        fade_in = np.linspace(0, 1, 10000)
+        fade_out = np.linspace(1, 0, 10000)
+        out[:10000] = out[:10000]*fade_in
+        out[-10000:] = out[-10000:]*fade_out
 
         fp = os.path.join(os.path.dirname(__file__), "temp-{}.wav".format(mode))
         audiofile.write(fp, out, sampling_rate)
@@ -267,7 +276,7 @@ class EffectClass:
 
 
 class GrammarGeneration:
-    def __init__(self, output_midi_port="iM/ONE 1", generation_length=3600, mem_length=10, ):
+    def __init__(self, output_midi_port="iM/ONE 1", generation_length=3600, mem_length=10):
         self.generation_length = generation_length
         self.mem_length = mem_length
         self.output_midi_port = output_midi_port
@@ -314,29 +323,51 @@ class GrammarGeneration:
         # Initialize numpy array with gaussian noise
         x = np.random.normal(0, 1, fixed_backround_audio_time * sr)
         # Filter out values lower than 0.9 to create random impulse responses
-        x[x < 4.] = 0
+        x[x < 3] = 0
+
+        waves = np.array([
+            np.sin(2 * np.pi * 60 * np.arange(fixed_backround_audio_time * sr) / sr),
+            # create a wave of 61Hz
+            np.sin(2 * np.pi * 61 * np.arange(fixed_backround_audio_time * sr) / sr),
+            # create a wave of 100Hz
+            np.sin(2 * np.pi * 100 * np.arange(fixed_backround_audio_time * sr) / sr),
+            0.9*np.sin(2 * np.pi * 102 * np.arange(fixed_backround_audio_time * sr) / sr),
+            0.5*np.sin(2 * np.pi * 500 * np.arange(fixed_backround_audio_time * sr) / sr),
+            0.3*np.sin(2 * np.pi * 1000 * np.arange(fixed_backround_audio_time * sr) / sr)
+        ])
+
+
+
         # Create filter of sawtooth impulse response
-        b = np.linspace(1, 0, sr//4, endpoint=False)
+        b = np.linspace(1, 0, sr//20, endpoint=False)
         s = signal.lfilter(b, [1], x)
+        # add all together
+        waves = np.sum(waves, axis=0)
+        # normalize
+        waves = waves / np.max(np.abs(waves))
+        s = waves*s
         # Normalize s between -1 and 1
         s = s / np.max(np.abs(s))
 
         # Apply other audio effects
         effects = Compose([
-            AddGaussianNoise(min_amplitude=0.001, max_amplitude=0.01, p=0.5),
+            # AddGaussianNoise(min_amplitude=0.001, max_amplitude=0.01, p=0.5),
             # ApplyImpulseResponse(, p=0.5),
-            AirAbsorption(min_temperature=10, max_temperature=20, p=0.5),
+            AirAbsorption(min_temperature=10, max_temperature=20, p=0.2),
             GainTransition(min_gain_in_db=-20, max_gain_in_db=0, p=0.5),
-            TimeMask(min_band_part=0.01, max_band_part=0.1, fade=False, p=0.5),
+            TimeMask(min_band_part=0.01, max_band_part=0.1, fade=True, p=0.8),
         ])
         # Apply effects
-        s = effects(s, sr)
+        # s = effects(s, sr)
+        # Normalize s between -1 and 1
+        s = s / np.max(np.abs(s))
         # Do a Fade-in of 1s
-        ramp = np.ones(s.shape, dtype=float)
-        ramp[:sr] = np.linspace(0., 1., sr)
-        s = s * ramp
+        ramp = np.linspace(0., 1., sr)
+        s[:sr] = s[:sr] * ramp
+        # Scale audio to 0.5
+        s = s * 0.1
         # Save audio file
-        audiofile.write(os.path.join(save_path, "background.wav"), s, 48000)
+        audiofile.write(os.path.join(save_path, "background.wav"), s, sr)
         # ApplyImpulseResponse(os.path.join(save_path, "background.wav"), p=0.5)
         return os.path.join(save_path, "background.wav")
 
@@ -389,10 +420,10 @@ class GrammarGeneration:
                 wf_audio_p = wave.open(audio_path, 'rb')
                 if random.randint(0, 100) < 80:
                     print("Playing audio clip.")
-                    running_audio_data = wf_audio_p.readframes(CHUNK)
+                    running_audio_data_p = wf_audio_p.readframes(CHUNK)
             else:
                 audio_stream.write(running_audio_data_p)
-                running_audio_data = wf_audio_p.readframes(CHUNK)
+                running_audio_data_p = wf_audio_p.readframes(CHUNK)
 
 
         background_stream.stop_stream()
