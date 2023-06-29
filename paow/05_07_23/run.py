@@ -6,38 +6,11 @@ import os
 import audiofile
 from audiomentations import Compose, AddGaussianNoise, TimeStretch, PitchShift, Shift, AirAbsorption, ApplyImpulseResponse, TimeMask, GainTransition
 import zipfile
-import pyaudio
 import wave
+import pyaudio
 import threading
 from scipy import signal
-
-
-class AudioFile:
-    chunk = 1024
-
-    def __init__(self, file):
-        """ Init audio stream """
-        self.wf = wave.open(file, 'rb')
-        self.p = pyaudio.PyAudio()
-        self.stream = self.p.open(
-            format = self.p.get_format_from_width(self.wf.getsampwidth()),
-            channels = self.wf.getnchannels(),
-            rate = self.wf.getframerate(),
-            output = True,
-        )
-
-    def play(self):
-        """ Play entire file """
-        data = self.wf.readframes(self.chunk)
-        while data != b'':
-            self.stream.write(data)
-            data = self.wf.readframes(self.chunk)
-
-    def close(self):
-        """ Graceful shutdown """
-        self.stream.close()
-        self.p.terminate()
-
+from scipy.interpolate import interp1d
 
 
 grammar = {
@@ -274,6 +247,24 @@ class EffectClass:
         ])
         return effect
 
+def random_wave(length, sr=48000, base_freq=60, change_every=1, step=50):
+    change_every = length // change_every
+
+    x_samples = np.arange(0, change_every*step, step)
+    freq_samples = (np.random.random(x_samples.shape)*2*step - step) + base_freq
+
+    x = np.arange(length * sr) / sr
+
+    dx = 2*np.pi*x
+
+    interpolation = interp1d(x_samples, freq_samples, kind='quadratic')
+    freq = interpolation(x)
+
+    x_plot = freq*dx  # Cumsum freq * change in x
+
+    y = np.sin(x_plot)
+    return y
+
 
 class GrammarGeneration:
     def __init__(self, output_midi_port="iM/ONE 1", generation_length=3600, mem_length=10):
@@ -323,17 +314,18 @@ class GrammarGeneration:
         # Initialize numpy array with gaussian noise
         x = np.random.normal(0, 1, fixed_backround_audio_time * sr)
         # Filter out values lower than 0.9 to create random impulse responses
-        x[x < 3] = 0
+        x[x < 2.5] = 0
 
+        # create a wave of random frequency that changes every second
         waves = np.array([
-            np.sin(2 * np.pi * 60 * np.arange(fixed_backround_audio_time * sr) / sr),
+            random_wave(fixed_backround_audio_time, sr=sr, base_freq=60, step=30),
             # create a wave of 61Hz
-            np.sin(2 * np.pi * 61 * np.arange(fixed_backround_audio_time * sr) / sr),
+            random_wave(fixed_backround_audio_time, sr=sr, base_freq=80, step=30),
             # create a wave of 100Hz
-            np.sin(2 * np.pi * 100 * np.arange(fixed_backround_audio_time * sr) / sr),
-            0.9*np.sin(2 * np.pi * 102 * np.arange(fixed_backround_audio_time * sr) / sr),
-            0.5*np.sin(2 * np.pi * 500 * np.arange(fixed_backround_audio_time * sr) / sr),
-            0.3*np.sin(2 * np.pi * 1000 * np.arange(fixed_backround_audio_time * sr) / sr)
+            random_wave(fixed_backround_audio_time, sr=sr, base_freq=200, step=50),
+            0.9*random_wave(fixed_backround_audio_time, sr=sr, base_freq=200, step=50),
+            random_wave(fixed_backround_audio_time, sr=sr, base_freq=500, step=100),
+            random_wave(fixed_backround_audio_time, sr=sr, base_freq=1000, step=400),
         ])
 
 
