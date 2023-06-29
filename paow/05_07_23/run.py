@@ -11,6 +11,7 @@ import pyaudio
 import threading
 from scipy import signal
 from scipy.interpolate import interp1d
+from pedalboard import Reverb, Gain, Chorus, Convolution, Compressor, Phaser, LadderFilter, Pedalboard
 
 
 grammar = {
@@ -358,9 +359,18 @@ class GrammarGeneration:
         s[:sr] = s[:sr] * ramp
         # Scale audio to 0.5
         s = s * 0.1
+        board = Pedalboard([
+            Compressor(threshold_db=-50, ratio=25),
+            Gain(gain_db=30),
+            Chorus(),
+            Phaser(),
+            Reverb(room_size=0.25),
+        ])
+        s = board(s, sr)
+        s = s / np.max(np.abs(s))
         # Save audio file
         audiofile.write(os.path.join(save_path, "background.wav"), s, sr)
-        # ApplyImpulseResponse(os.path.join(save_path, "background.wav"), p=0.5)
+        ApplyImpulseResponse(os.path.join(save_path, "background.wav"), p=0.5)
         return os.path.join(save_path, "background.wav")
 
     def start_audio_generation(self):
