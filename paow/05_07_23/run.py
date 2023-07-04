@@ -309,7 +309,7 @@ class GrammarGeneration:
 
     def generate_background_audio(self, save_path, sr=48000):
         # Fixed background audio time in seconds (5 minutes)
-        fixed_backround_audio_time = 5*60
+        fixed_backround_audio_time = 3*60
         fixed_backround_audio_time = fixed_backround_audio_time if fixed_backround_audio_time < self.generation_length else self.generation_length
 
         # Initialize numpy array with gaussian noise
@@ -319,14 +319,8 @@ class GrammarGeneration:
 
         # create a wave of random frequency that changes every second
         waves = np.array([
-            random_wave(fixed_backround_audio_time, sr=sr, base_freq=60, step=30),
-            # create a wave of 61Hz
-            random_wave(fixed_backround_audio_time, sr=sr, base_freq=80, step=30),
-            # create a wave of 100Hz
-            random_wave(fixed_backround_audio_time, sr=sr, base_freq=200, step=50),
-            0.9*random_wave(fixed_backround_audio_time, sr=sr, base_freq=200, step=50),
-            random_wave(fixed_backround_audio_time, sr=sr, base_freq=500, step=100),
-            random_wave(fixed_backround_audio_time, sr=sr, base_freq=1000, step=400),
+            random_wave(fixed_backround_audio_time, sr=sr, base_freq=i, step=i//5)
+            for i in np.random.randint(40, 1500, 5)
         ])
 
 
@@ -338,7 +332,7 @@ class GrammarGeneration:
         waves = np.sum(waves, axis=0)
         # normalize
         waves = waves / np.max(np.abs(waves))
-        s = waves*s
+        s = waves * s
         # Normalize s between -1 and 1
         s = s / np.max(np.abs(s))
 
@@ -346,7 +340,7 @@ class GrammarGeneration:
         effects = Compose([
             # AddGaussianNoise(min_amplitude=0.001, max_amplitude=0.01, p=0.5),
             # ApplyImpulseResponse(, p=0.5),
-            AirAbsorption(min_temperature=10, max_temperature=20, p=0.2),
+            # AirAbsorption(min_temperature=10, max_temperature=20, p=0.2),
             GainTransition(min_gain_in_db=-20, max_gain_in_db=0, p=0.5),
             TimeMask(min_band_part=0.01, max_band_part=0.1, fade=True, p=0.8),
         ])
@@ -358,16 +352,17 @@ class GrammarGeneration:
         ramp = np.linspace(0., 1., sr)
         s[:sr] = s[:sr] * ramp
         # Scale audio to 0.5
-        s = s * 0.1
         board = Pedalboard([
-            Compressor(threshold_db=-50, ratio=25),
-            Gain(gain_db=30),
+            # Compressor(threshold_db=-50, ratio=25),
+            # Gain(gain_db=30),
             Chorus(),
             Phaser(),
-            Reverb(room_size=0.25),
+            Reverb(room_size=0.5),
         ])
         s = board(s, sr)
         s = s / np.max(np.abs(s))
+
+        s = s * 0.01
         # Save audio file
         audiofile.write(os.path.join(save_path, "background.wav"), s, sr)
         ApplyImpulseResponse(os.path.join(save_path, "background.wav"), p=0.5)
@@ -441,7 +436,7 @@ class GrammarGeneration:
 
 if __name__ == "__main__":
     # Download Audio clips.
-    GrammarGeneration(generation_length=120)
+    GrammarGeneration(generation_length=600)
 
 
 
