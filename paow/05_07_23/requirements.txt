@@ -1,0 +1,5 @@
+numpy
+mido
+audiofile==1.2.1
+audiomentations==0.30.0
+git+https://github.com/nwhitehead/swmixer.git
