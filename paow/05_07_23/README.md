@@ -1,7 +1,13 @@
 # Formal Grammar Generation with MIDI and Audio
 
-For this experiment we use formal grammar like generation, with rule perturbation and memory.
-Our generation has two parts a MIDI Message generation and an Audio generation.
+This experiment explores the use of formal grammar for music generation.
+We combine two grammars one for audio and one for MIDI generation.
+The MIDI grammar contains 4 patterns and everytime a pattern is selected there is perturbation applied.
+Similarly, for the audio grammar. In addition, every grammar is accompanied by a memory that keeps track of the
+last selected patterns. The memory is used to select the next pattern to be generated giving more probability to the
+last selected pattern to be selected again. This experiment is based on works created by the composer
+Morton Feldmann, we use a soft dynamic range, a slow tempo and a repetive feeling that always repeats patterns but never quite at the same way.
+
 
 ## MIDI Message Generation
 

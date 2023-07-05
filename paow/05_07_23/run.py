@@ -350,7 +350,7 @@ class GrammarGeneration:
             TimeMask(min_band_part=0.01, max_band_part=0.1, fade=True, p=0.8),
         ])
         # Apply effects
-        # s = effects(s, sr)
+        s = effects(s, sr)
         # Normalize s between -1 and 1
         s = s / np.max(np.abs(s))
         # Do a Fade-in of 1s
