@@ -293,18 +293,25 @@ class GrammarGeneration:
         self.start_audio_generation()
 
     def download_files(self):
-
-        url = ""
+        """
+        Download audio files from dropbox
+        Returns:
+            save_path: path to the downloaded files
+        """
+        url = "https://www.dropbox.com/sh/xqrkq4ka8a5tvxa/AAA7j8JYvyECOfsPRdNc4Fsea?dl=1"
         if not os.path.exists(os.path.join(os.path.dirname(__file__), "audio_files")):
             import requests
-            save_path = os.path.join(os.path.dirname(__file__), "audio_files.zip")
+            save_path = os.path.join(os.path.dirname(__file__), "audio_files", "audio_files.zip")
+            # create directory if it doesn't exist'
+            if not os.path.exists(os.path.dirname(save_path)):
+                os.makedirs(os.path.dirname(save_path))
             r = requests.get(url, stream=True)
             with open(save_path, 'wb') as fd:
                 for chunk in r.iter_content(chunk_size=128):
                     fd.write(chunk)
             # unzip files
             with zipfile.ZipFile(save_path, 'r') as zip_ref:
-                zip_ref.extractall(os.path.dirname(__file__))
+                zip_ref.extractall(os.path.join(os.path.dirname(__file__), "audio_files"))
         return os.path.join(os.path.dirname(__file__), "audio_files")
 
     def generate_background_audio(self, save_path, sr=48000):
@@ -322,8 +329,6 @@ class GrammarGeneration:
             random_wave(fixed_backround_audio_time, sr=sr, base_freq=i, step=i//5)
             for i in np.random.randint(40, 1500, 5)
         ])
-
-
 
         # Create filter of sawtooth impulse response
         b = np.linspace(1, 0, sr//20, endpoint=False)
