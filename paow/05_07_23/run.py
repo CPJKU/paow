@@ -440,8 +440,17 @@ class GrammarGeneration:
 
 
 if __name__ == "__main__":
-    # Download Audio clips.
-    GrammarGeneration(generation_length=600)
+    import argparse
+
+    args = argparse.ArgumentParser()
+    args.add_argument("--generation_length", type=int, default=3600, help="Length of the generated audio in seconds")
+    args.add_argument("--mem_length", type=int, default=10, help="Length of the memory of the audio and midi generation")
+    args.add_argument("--output_midi_port", type=str, default="iM/ONE 1", help="Name of the midi port to send the generated midi to")
+
+    args = args.parse_args()
+
+    GrammarGeneration(generation_length=args.generation_length, mem_length=args.mem_length,
+                      output_midi_port=args.output_midi_port)
 
 
 

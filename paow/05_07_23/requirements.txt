@@ -1,5 +1,9 @@
-numpy
-mido
+numpy==1.18.5
+scipy==1.4.1
+mido==1.2.9
+python-rtmidi==1.4.6
 audiofile==1.2.1
+argparse==1.4.0
 audiomentations==0.30.0
-git+https://github.com/nwhitehead/swmixer.git
+pedalboard==0.1.0
+
