@@ -36,6 +36,6 @@ pip install -r requirements.txt
 To run the experiment run:
 
 ```bash
-python run.py
+python run.py --generation_length 60 --output_midi_port SomeMidiDeviceName
 ```
 
