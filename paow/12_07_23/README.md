@@ -1,5 +1,5 @@
 
-In this experiment a music generation neural network extends the super mario theme for an hour, 
+In this experiment a music generation neural network extends the Super Mario Bros theme for an hour, 
 gradually forgetting where it started. 
 
 The model used is the Discrete Denoising Probabilistic Diffusion Model SCHmUBERT {Plasser et al.}.
@@ -23,4 +23,4 @@ Technical equipment:
 Grand piano: Yamaha disklavier Enspire Pro C1X  
 Audio interface: Focusrite Scarlett 18i8  
 Microphones: a pair of AKG P420  
-Camera 1: Canon EOS 250D  
+Camera: Canon EOS 250D  
