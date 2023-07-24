@@ -45,3 +45,9 @@ To run the experiment run:
 python run.py --generation_length 60 --output_midi_port SomeMidiDeviceName
 ```
 
+### Technical equipment
+
+Grand piano: Yamaha Disklavier Enspire Pro C1X  
+Audio interface: Focusrite Scarlett 18i8  
+Microphones: a pair of AKG P420  
+Camera: Canon EOS 250D  
