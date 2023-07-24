@@ -1,0 +1,5 @@
+numpy==1.18.5
+scipy==1.4.1
+mido==1.2.9
+python-rtmidi==1.4.6
+argparse==1.4.0
