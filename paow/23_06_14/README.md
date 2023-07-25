@@ -10,25 +10,25 @@ This experiment aims to highlight our conception of what an expressive performan
 In this experiment, we use the Basis Mixer, a neural network-based model that renders a human-like performance of a piece of music given its score, in terms of variations in dynamics, tempo, timing and articulation. 
 This Basis Mixer was trained on a corpus of performances of (nearly) the entire solo piano oeuvre by Frédéric Chopin played by Nikita Magaloff, one of the last "Romantic" pianists of the 20th Century.
 
-Basis Mixer: http://www.carloscancinochacon.com/documents/thesis/Cancino-JKU-2018.pdf
-The Hanon: https://en.wikipedia.org/wiki/The_Virtuoso_Pianist_in_60_Exercises
-Frédéric Chopin: https://en.wikipedia.org/wiki/Frédéric_Chopin
-Nikita Magaloff: https://en.wikipedia.org/wiki/Nikita_Magaloff
+Basis Mixer: http://www.carloscancinochacon.com/documents/thesis/Cancino-JKU-2018.pdf  
+The Hanon: https://en.wikipedia.org/wiki/The_Virtuoso_Pianist_in_60_Exercises  
+Frédéric Chopin: https://en.wikipedia.org/wiki/Frédéric_Chopin  
+Nikita Magaloff: https://en.wikipedia.org/wiki/Nikita_Magaloff  
 
 Generation environment:
 
-Python 3.9
-mido / python-rtmidi
-numpy
-pytorch
-partitura
-basismixer
-https://github.com/CPJKU/paow/
+Python 3.9  
+mido / python-rtmidi  
+numpy  
+pytorch  
+partitura  
+basismixer  
+https://github.com/CPJKU/paow/  
 
 Technical equipment:
 
-Grand piano: Yamaha disklavier Enspire Pro C1X
-Audio interface: Focusrite Scarlett 18i8
-Microphones: a pair of AKG P420
-Camera 1: Canon EOS 250D
-Camera 2: GoPro Hero 11 
+Grand piano: Yamaha disklavier Enspire Pro C1X  
+Audio interface: Focusrite Scarlett 18i8  
+Microphones: a pair of AKG P420  
+Camera 1: Canon EOS 250D  
+Camera 2: GoPro Hero 11  
