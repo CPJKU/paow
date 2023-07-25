@@ -195,6 +195,10 @@ def generate_and_send_midi(music_grammar, port_name, generation_length=3600, mem
 
                 # Wait for the next note
                 time.sleep(w[i] / 1000)
+            # Release the pedal
+            if random.random() < 0.1:
+                msg = mido.Message('control_change', control=64, value=127)
+                port.send(msg)
             # Wait for the next generation
             ########
             time.sleep(random.randint(1, 50) * 0.1)
@@ -443,7 +447,7 @@ if __name__ == "__main__":
     import argparse
 
     args = argparse.ArgumentParser()
-    args.add_argument("--generation_length", type=int, default=3600, help="Length of the generated audio in seconds")
+    args.add_argument("--generation_length", type=int, default=2200, help="Length of the generated audio in seconds")
     args.add_argument("--mem_length", type=int, default=10, help="Length of the memory of the audio and midi generation")
     args.add_argument("--output_midi_port", type=str, default="iM/ONE 1", help="Name of the midi port to send the generated midi to")
 
