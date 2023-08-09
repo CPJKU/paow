@@ -1,0 +1,14 @@
+name: paow_2023_08_09
+
+channels:
+  - defaults
+
+dependencies:
+  - python=3.9
+  - numpy
+  - scipy
+  - tqdm
+
+  - pip:
+    - partitura
+
