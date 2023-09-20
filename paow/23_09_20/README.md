@@ -12,9 +12,11 @@ Generation environment:
 
 Python 3.9  
 partitura: https://github.com/CPJKU/partitura
-https://github.com/CPJKU/paow
+vcv: https://vcvrack.com/
+clouds: https://library.vcvrack.com/AudibleInstruments/Clouds
+logistic map: https://en.wikipedia.org/wiki/Logistic_map
+paow: https://github.com/CPJKU/paow
 
-https://library.vcvrack.com/AudibleInstruments/Clouds
 
 Technical equipment:
 
