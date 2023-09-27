@@ -54,6 +54,8 @@ def granulate_pianoroll(pianoroll, granularity):
             split_sizes.append(random_granularity)
             rest = rest - random_granularity
         split_sizes.append(rest)
+        split_sizes = np.array(split_sizes)
+        split_sizes = np.cumsum(split_sizes)
         x = np.split(pianoroll, split_sizes, axis=0)
         random_permutation = np.random.permutation(len(x))
         x_new = [x[i] for i in random_permutation]
@@ -79,9 +81,9 @@ def main():
     random_permutation = np.random.permutation(len(midi_files))
     midi_files = np.array(midi_files)[random_permutation]
 
-    pianoroll = get_pianoroll_from_midi(midi_files[:10])
+    pianoroll = get_pianoroll_from_midi(midi_files[:5])
 
-    granulation = (0.1, 4)
+    granulation = (0.5, 4)
     # granulate pianoroll
     new_pianoroll = granulate_pianoroll(pianoroll, granulation)
 
