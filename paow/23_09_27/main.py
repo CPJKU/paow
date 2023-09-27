@@ -37,15 +37,33 @@ def get_pianoroll_from_midi(midi_files):
 
 
 def granulate_pianoroll(pianoroll, granularity):
+
+
     pianoroll = pianoroll
     # split pianoroll into granularity pieces
-    granularity = granularity*100
+
     dim = pianoroll.shape[0]
-    re_index = int(dim % granularity)
-    x = np.array(np.split(pianoroll[:-re_index], dim // granularity, axis=0))
-    # random permutation over the 0th axis
-    random_permutation = np.random.permutation(x.shape[0])
-    x_new = x[random_permutation]
+    if isinstance(granularity, tuple) or isinstance(granularity, list):
+        import random
+        granularity_start = int(granularity[0] * 100)
+        granularity_end = int(granularity[1] * 100)
+        rest = int(dim)
+        split_sizes = []
+        while rest > granularity_end:
+            random_granularity = random.randint(granularity_start, granularity_end)
+            split_sizes.append(random_granularity)
+            rest = rest - random_granularity
+        split_sizes.append(rest)
+        x = np.split(pianoroll, split_sizes, axis=0)
+        random_permutation = np.random.permutation(len(x))
+        x_new = [x[i] for i in random_permutation]
+    else:
+        granularity = granularity * 100
+        re_index = int(dim % granularity)
+        x = np.array(np.split(pianoroll[:-re_index], dim // granularity, axis=0))
+        # random permutation over the 0th axis
+        random_permutation = np.random.permutation(x.shape[0])
+        x_new = x[random_permutation]
     # concatenate over the 0th axis
     x_new = np.concatenate(x_new, axis=0)
     return x_new.T
@@ -61,9 +79,9 @@ def main():
     random_permutation = np.random.permutation(len(midi_files))
     midi_files = np.array(midi_files)[random_permutation]
 
-    pianoroll = get_pianoroll_from_midi(midi_files[:2])
+    pianoroll = get_pianoroll_from_midi(midi_files[:10])
 
-    granulation = 2
+    granulation = (0.1, 4)
     # granulate pianoroll
     new_pianoroll = granulate_pianoroll(pianoroll, granulation)
 
