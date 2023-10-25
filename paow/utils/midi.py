@@ -8,7 +8,6 @@ from collections import defaultdict
 import partitura as pt
 import winsound
 
-
 class MidiInputThread(threading.Thread):
     def __init__(
         self,
@@ -79,13 +78,11 @@ class MidiInputThread(threading.Thread):
         # reset init time
         self.init_time = None
 
-
 def midi_msg_to_pt_note(msg):
     return msg
 
 def pt_note_to_midi_msg(pt_note):
     return pt_note
-
 
 class MidiRouter(object):
     """
@@ -263,7 +260,6 @@ class MidiRouter(object):
         else:
             return None
 
-
 def play_midi_from_score(score=None, 
                          midirouter=None, 
                          quarter_duration=1, 
@@ -416,18 +412,101 @@ def addnote(midipitch, part,
                         octave=int(octave), alter=alter, voice=voice, staff=int(voice)),
                         start=start, end=end)
 
-if __name__ == "__main__":
-    part = pt.load_musicxml(pt.EXAMPLE_MUSICXML)[0]
-    queue =multiprocessing.Queue()
-    s = Sequencer(queue=queue,
-                  outport_name="iM/ONE")
-    s.start()
-    time.sleep(2)
-    s.up(part)
+class MidiSyncSender(multiprocessing.Process):
+    def __init__(self, 
+                 outport_name,
+                 queue, 
+                 tempo,
+                 *args, **kwargs):
+        super(MidiSyncSender, self).__init__(*args, **kwargs)
+        self.outport_name = outport_name
+        self.router = MidiRouter(outport_name = self.outport_name)        
+        self.queue = queue
+        self.playing = False    
+        self.update_time = self.set_time(tempo)
+        self.reset()
 
-    # addnote(97, part, start=3, end=4, idx=100)
+        self.start_msg = mido.Message.from_bytes([0xFA])
+        self.sync_msg = mido.Message.from_bytes([0xF8])
+        self.stop_msg = mido.Message.from_bytes([0xFC])
+
+    def reset(self):
+        self.counter = 0
+        self.playing = False
+        self.current_time = time.perf_counter_ns()
+        self.playnext = time.perf_counter_ns()
+
+    def set_time(self, tempo_in_bpm):
+        seconds_per_beat = 60/tempo_in_bpm
+        # https://www.midi.org/specifications/midi-reference-tables/summary-of-midi-1-0-messages
+        # 11111000 Timing Clock. Sent 24 times per quarter note when synchronization is required (see text).
+        seconds_per_clock = seconds_per_beat / 24
+        ns_per_clock = int(seconds_per_clock * 1e9)
+        return ns_per_clock
+
+    def up(self, args):
+        self.queue.put(args)
+
+    def run(self):
+
+        self.sendMIDISYNC()
+
+    def sendMIDISYNC(self):     
+        self.reset()
+        self.playing = True
+        self.router.output_port.send(self.start_msg)
+            
+        while self.playing:
+            try: 
+                tmp = self.queue.get_nowait()
+                # print(args.note_array())
+                self.update_time = self.set_time(tmp)
+            except:
+                pass
+
+            try:
+                """ Check the time and produce MIDI messages if needed: """
+                self.current_time = time.perf_counter_ns()
+                if self.current_time >= self.playnext:     
+                    self.router.output_port.send(self.sync_msg)
+                    self.playnext += self.update_time
+                    self.counter += 1
+                                                
+                time.sleep(1e-5)
+            
+            except KeyboardInterrupt:
+                self.stopMIDISYNC()
+                break
+
+    def stop(self):
+        self.stopMIDISYNC()
+
+    def stopMIDISYNC(self):
+        self.playing = False
+        self.router.output_port.send(self.stop_msg)
+        self.router.panic()
+        self.router.close_ports()
+        self.terminate()
+        self.join()
+
+
+
+if __name__ == "__main__":
+    # part = pt.load_musicxml(pt.EXAMPLE_MUSICXML)[0]
+    # queue =multiprocessing.Queue()
+    # s = Sequencer(queue=queue,
+    #               outport_name="seq")
+    # s.start()
+    # time.sleep(2)
     # s.up(part)
 
-    # time.sleep(4)
-    # s.terminate()
-    # s.join()
+    # # addnote(97, part, start=3, end=4, idx=100)
+    # # s.up(part)
+
+    # # time.sleep(4)
+    # # s.terminate()
+    # # s.join()
+
+    queue = multiprocessing.Queue()
+    mss = MidiSyncSender("seq", queue, 100)
+    mss.start()
